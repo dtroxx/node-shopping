@@ -3,6 +3,7 @@ const router = express.Router();
 const Cart = require('../models/cart');
 
 const Product = require('../models/product');
+const Order = require('../models/order');
 
 /* GET home page. */
 router.get('/', (req, res, next) => {
@@ -31,6 +32,24 @@ router.get('/add-to-cart/:id', (req, res, next) => {
   });
 });
 
+router.get('/reduce/:id', (req, res, next) => {
+  const productId = req.params.id;
+  const cart = new Cart(req.session.cart ? req.session.cart : {});
+
+  cart.reduceByOne(productId);
+  req.session.cart = cart;
+  res.redirect('/shopping-cart');
+});
+
+router.get('/remove/:id', (req, res, next) => {
+  const productId = req.params.id;
+  const cart = new Cart(req.session.cart ? req.session.cart : {});
+
+  cart.removeItem(productId);
+  req.session.cart = cart;
+  res.redirect('/shopping-cart');
+});
+
 router.get('/shopping-cart', (req, res, next) => {
   // check if there is a cart
   if (!req.session.cart) {
@@ -43,7 +62,7 @@ router.get('/shopping-cart', (req, res, next) => {
   res.render('shop/shopping-cart', { products: cart.generateArray(), totalPrice: cart.totalPrice });
 });
 
-router.get('/checkout', (req, res, next) => {
+router.get('/checkout', isLoggedIn, (req, res, next) => {
   if (!req.session.cart) {    
     return res.redirect('/shopping-cart');
   }
@@ -52,7 +71,7 @@ router.get('/checkout', (req, res, next) => {
   res.render('shop/checkout', { total: cart.totalPrice, errMsg: errMsg, noError: !errMsg });
 });
 
-router.post('/checkout', (req, res, next) => {
+router.post('/checkout', isLoggedIn, (req, res, next) => {
   if (!req.session.cart) {    
     return res.redirect('/shopping-cart');
   }
@@ -72,10 +91,30 @@ router.post('/checkout', (req, res, next) => {
         req.flash('error', err.message);
         return res.redirect('/checkout');
     }
-    req.flash('success', 'Purchase Successful!');
-    req.session.cart = null; // clear the cart
-    res.redirect('/');
+    var order = new Order({
+      user: req.user,
+      cart: cart,
+      address: req.body.address,
+      name: req.body.name,
+      paymentId: charge.id  // passed to callback of stripe.charges.create
+    });
+    order.save(function(err, result){ // save order to database
+      if (err) {
+        console.log(err);
+      }
+      req.flash('success', 'Purchase Successful!');
+      req.session.cart = null; // clear the cart
+      res.redirect('/');
+    });    
   });
 });
 
 module.exports = router;
+
+function isLoggedIn(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  req.session.oldUrl = req.url; // url where non logged in user came from
+  res.redirect('/user/signin');
+}

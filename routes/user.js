@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const csrf = require('csurf');
 const passport = require('passport');
+const userController = require('../controllers/userController');
 
 const Order = require('../models/order');
 const Cart = require('../models/cart');
@@ -9,34 +10,14 @@ const Cart = require('../models/cart');
 var csrfProtection = csrf();
 router.use(csrfProtection);
 
-router.get('/profile', isLoggedIn, function (req, res, next) {
-  Order.find({user: req.user}, function(err, orders) {
-    if (err) {
-      return res.write('Error!');
-    }
-    var cart;
-    orders.forEach(function(order) {
-      cart = new Cart(order.cart);
-      order.items = cart.generateArray();
-    });
-    res.render('user/profile', { orders: orders });
-    });
-});
-
-router.get('/logout', (req, res, next) => {
-  req.logout();
-  res.redirect('/');
-});
+router.get('/profile', isLoggedIn, userController.getProfile);
+router.get('/logout', userController.logout);
 
 router.use('/', notLoggedIn, (req, res, next) => {
   next();
 })
 
-router.get('/signup', (req, res, next) => {
-// error messages coming from passport stored under 'error'
-  const messages = req.flash('error');
-  res.render('user/signup', { csrfToken: req.csrfToken(), messages: messages, hasErrors: messages.length > 0 });
-});
+router.get('/signup', userController.getSignup);
 
 router.post('/signup', passport.authenticate('local.signup', {
   failureRedirect: '/user/signup',

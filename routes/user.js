@@ -62,7 +62,7 @@ router.post('/signin', passport.authenticate('local.signin', {
 }), function(req, res, next) {
   if (req.session.oldUrl) { // if coming from checkout not logged in
     var oldUrl = req.session.oldUrl;
-    res.session.oldUrl = null;
+    req.session.oldUrl = null;
     res.redirect(oldUrl); 
   } else {
       res.redirect('/user/profile'); // if not coming from checkout
